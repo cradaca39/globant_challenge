@@ -69,7 +69,7 @@ WHERE s.conteo > m.mean '''
     with engine.connect() as conn, conn.begin():  
         data = pd.read_sql(query, conn)
         print(data)  
-    return data.to_json(),200
+    return data.to_json(orient="values"),200
 
 @employees.get('/jobs-by-quarter')
 def jobs_by_quarter_query():
@@ -134,7 +134,7 @@ def jobs_by_quarter_query():
     with engine.connect() as conn, conn.begin():  
         data = pd.read_sql(query, conn)
         print(data)  
-    return data.to_json(),200
+    return data.to_json(orient="values"),200
 
 
 
