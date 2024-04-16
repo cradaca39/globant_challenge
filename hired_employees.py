@@ -20,52 +20,21 @@ def allowed_file(filename):
 def employees_by_departments_query():
     database = Database()
     engine = database.connection()
-    query = ''' WITH deparments AS
-(
-SELECT DISTINCT
-	id,
-    department
-FROM globant.departments d
-),
-
-employees AS
-(
-SELECT DISTINCT
-	id,
-    id_deparment
-FROM globant.employees e
-),
-
-mean AS
-(
-SELECT
-	AVG(m.conteo) as mean
-FROM(
-SELECT DISTINCT
-	e.id_deparment,
-	COUNT(DISTINCT e.id) as conteo
-FROM globant.employees e
-WHERE YEAR(hired_date) = '2021'
-GROUP BY 1) as m
-), 
-
-summary AS (
-SELECT 
-	d.id,
-    d.department,
-    count(distinct e.id) AS conteo
-FROM employees e
-INNER JOIN deparments d
-	ON (e.id_deparment = d.id)
-GROUP BY 1,2
-    )
-    
-SELECT 
-	s.id,
-    s.department,
-    s.conteo
-FROM summary s, mean m
-WHERE s.conteo > m.mean '''
+    query = ''' select 
+                    d.id, 
+                    d.department, 
+                    count(e.id) as hired
+                from globant.employees e 
+                join globant.departments d 
+                on (e.id_deparment = d.id)
+                where substr(e.hired_date,1,4) = '2021' 
+                group by department
+                having hired > (select count(e.id)/12
+                                from globant.employees e 
+                                where substr(e.hired_date,1,4) = '2021'
+                            )
+                order by hired desc
+ '''
     with engine.connect() as conn, conn.begin():  
         data = pd.read_sql(query, conn)
         print(data)  
@@ -75,61 +44,22 @@ WHERE s.conteo > m.mean '''
 def jobs_by_quarter_query():
     database = Database()
     engine = database.connection()
-    query = ''' WITH deparments AS
-                (
-                SELECT DISTINCT
-                    id,
-                    department
-                FROM globant.departments d
-                ),
-
-                employees AS
-                (
-                SELECT DISTINCT
-                    id,
-                    id_job,
-                    id_deparment,
-                    (CASE
-                        WHEN QUARTER(hired_date) = 1 THEN 'Q1'
-                        WHEN QUARTER(hired_date) = 2 THEN 'Q2'
-                        WHEN QUARTER(hired_date) = 3 THEN 'Q3'
-                        WHEN QUARTER(hired_date) = 4 THEN 'Q4' END) AS qrt
-                FROM globant.employees e
-                WHERE YEAR(hired_date) = '2021'
-                ),
-
-                jobs AS
-                (
-                SELECT DISTINCT
-                    id,
+    query = ''' select 	
+                    department, 
                     position
-                FROM globant.jobs j
-                ),
-
-                summary AS (
-                SELECT 
-                    e.qrt,
-                    j.position,
-                    d.department,
-                    COUNT(e.id) AS conteo
-                FROM employees e
-                INNER JOIN deparments d
-                    ON (e.id_deparment = d.id)
-                INNER JOIN jobs j
-                    ON (e.id_job = j.id)
-                GROUP BY 1,2,3
-                    )
-                    
-                SELECT 
-                    department,
-                    position,
-                    COUNT(CASE WHEN qrt = 'Q1' THEN conteo ELSE 0 END) AS Q1,
-                    COUNT(CASE WHEN qrt = 'Q2' THEN conteo ELSE 0 END) AS Q2,
-                    COUNT(CASE WHEN qrt = 'Q3' THEN conteo ELSE 0 END) AS Q3,
-                    COUNT(CASE WHEN qrt = 'Q4' THEN conteo ELSE 0 END) AS Q4
-                FROM summary
-                GROUP BY 1,2
-                ORDER BY 1,2
+                    ,count(case when substr(e.hired_date,6,2) in ('01','02','03') then e.id end) as Q1
+                    ,count(case when substr(e.hired_date,6,2) in ('04','05','06') then e.id end) as Q2
+                    ,count(case when substr(e.hired_date,6,2) in ('07','08','09') then e.id end) as Q3
+                    ,count(case when substr(e.hired_date,6,2) in ('10','11','12') then e.id end) as Q4
+                from
+                globant.employees e
+                join globant.jobs j 
+                    on (e.id_job = j.id)
+                join globant.departments d 
+                    on (e.id_deparment = d.id)
+                where substr(e.hired_date,1,4) = '2021'
+                group by position, department
+                order by department, position
                 '''
     with engine.connect() as conn, conn.begin():  
         data = pd.read_sql(query, conn)
@@ -168,10 +98,8 @@ def insert_data():
     df_employees["id_job"] = df_employees["id_job"].astype(int)
     print("read employees succesful")
 
-    engine = create_engine("mysql+mysqlconnector://root:1234@localhost/globant".
-                        format(user="root",
-                                pw="1235",
-                                db="globant"))
-
+    db = Database()
+    engine = db.connection()
+    
     df_employees.to_sql('employees', con=engine, if_exists='append', index=False)
     print("insert deparments sucessful")

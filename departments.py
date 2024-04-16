@@ -3,6 +3,7 @@ from flask import request, Blueprint, current_app
 from werkzeug.utils import secure_filename
 import pandas as pd
 from sqlalchemy import create_engine
+from database_connect import Database
 
 UPLOAD_FOLDER = './uploads'
 ALLOWED_EXTENSIONS = {'csv'}
@@ -38,11 +39,10 @@ def insert_data():
     df = pd.read_csv("uploads/departments.csv", delimiter=",",header=None)
     df.columns = ["id","department"]
     print("read departments succesful")
+    
+    db = Database()
+    engine = db.connection()
 
-    engine = create_engine("mysql+mysqlconnector://root:1234@localhost/globant".
-                        format(user="root",
-                                pw="1235",
-                                db="globant"))
 
     df.to_sql('departments', con=engine, if_exists='append', index=False)
     print("insert deparments sucessful")
