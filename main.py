@@ -1,8 +1,8 @@
 from departments import departments
 from jobs import jobs
 from hired_employees import employees
-from data_process import Data
 from flask import Flask
+
 
 if __name__ == "__main__":
 
